@@ -3,9 +3,10 @@
 import { useState, useTransition, useMemo } from 'react'
 import { deleteEntry, updateEntry } from './actions'
 import type { EntryRow, AccountRow, ActivityType } from '@/types/database'
+import { formatDate, STATUS_LABEL, STATUS_BADGE } from '@/lib/utils'
 
 type EntryWithAccount = EntryRow & {
-  account: Pick<AccountRow, 'id' | 'code' | 'name' | 'group_name'> | null
+  account: Pick<AccountRow, 'id' | 'code' | 'name' | 'sector'> | null
 }
 type Toast = { id: number; msg: string; type: 'success' | 'error' }
 
@@ -13,212 +14,131 @@ const ACTIVITY_TYPES: ActivityType[] = [
   'Auditoría', 'Reporte', 'Visita campo', 'Oficina', 'Viaje',
   'Capacitación', 'Reunión interna', 'Licencia', 'Vacaciones',
 ]
-
-const STATUS_FILTERS = ['Todos', 'Auditoría', 'Reporte', 'Oficina', 'Viaje', 'Capacitación']
-
-function formatDate(s: string) {
-  const d = new Date(s + 'T00:00:00')
-  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
-}
+const FILTERS = ['Todos', 'Auditoría', 'Reporte', 'Oficina', 'Viaje', 'Capacitación']
 
 interface Props {
   entries: EntryWithAccount[]
-  accounts: Pick<AccountRow, 'id' | 'code' | 'name' | 'group_name'>[]
+  accounts: Pick<AccountRow, 'id' | 'code' | 'name' | 'sector'>[]
 }
 
-export default function HistorialTable({ entries: initialEntries, accounts }: Props) {
-  const [filter, setFilter]     = useState('Todos')
-  const [search, setSearch]     = useState('')
-  const [toasts, setToasts]     = useState<Toast[]>([])
-  const [isPending, startTr]    = useTransition()
+export default function HistorialTable({ entries: initial, accounts }: Props) {
+  const [filter, setFilter]   = useState('Todos')
+  const [search, setSearch]   = useState('')
+  const [toasts, setToasts]   = useState<Toast[]>([])
+  const [isPending, startTr]  = useTransition()
 
-  // Edit modal state
-  const [editEntry, setEditEntry] = useState<EntryWithAccount | null>(null)
-  const [editDate, setEditDate]   = useState('')
-  const [editHours, setEditHours] = useState(8)
+  const [editEntry, setEditEntry]     = useState<EntryWithAccount | null>(null)
+  const [editDate, setEditDate]       = useState('')
+  const [editHours, setEditHours]     = useState(8)
   const [editAccount, setEditAccount] = useState('')
-  const [editType, setEditType]   = useState<ActivityType>('Auditoría')
+  const [editType, setEditType]       = useState<ActivityType>('Auditoría')
   const [editComment, setEditComment] = useState('')
 
-  function addToast(msg: string, type: 'success' | 'error') {
+  function toast(msg: string, type: 'success' | 'error') {
     const id = Date.now()
     setToasts(p => [...p, { id, msg, type }])
     setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500)
   }
 
   function openEdit(e: EntryWithAccount) {
-    setEditEntry(e)
-    setEditDate(e.date)
-    setEditHours(e.hours)
-    setEditAccount(e.account_id)
-    setEditType(e.activity_type)
-    setEditComment(e.comment ?? '')
+    setEditEntry(e); setEditDate(e.date); setEditHours(e.hours)
+    setEditAccount(e.account_id); setEditType(e.activity_type); setEditComment(e.comment ?? '')
   }
-  function closeEdit() { setEditEntry(null) }
 
   function handleDelete(id: string) {
     if (!confirm('¿Eliminar esta imputación?')) return
     startTr(async () => {
-      const res = await deleteEntry(id)
-      if (res.error)   addToast(res.error, 'error')
-      if (res.success) addToast(res.success, 'success')
+      const r = await deleteEntry(id)
+      if (r.error) toast(r.error, 'error')
+      else toast(r.success!, 'success')
     })
   }
 
-  function handleSaveEdit() {
+  function handleSave() {
     if (!editEntry) return
     startTr(async () => {
-      const res = await updateEntry(editEntry.id, {
-        date: editDate, hours: editHours,
-        account_id: editAccount,
-        activity_type: editType,
-        comment: editComment || null,
-      })
-      if (res.error)   addToast(res.error, 'error')
-      if (res.success) { addToast(res.success, 'success'); closeEdit() }
+      const r = await updateEntry(editEntry.id, { date: editDate, hours: editHours, account_id: editAccount, activity_type: editType, comment: editComment || null })
+      if (r.error) toast(r.error, 'error')
+      else { toast(r.success!, 'success'); setEditEntry(null) }
     })
   }
 
-  // Export CSV
   function exportCSV() {
     const rows = [['Fecha','Subcuenta','Actividad','Horas','Comentario','Estado']]
-    filtered.forEach(e => rows.push([
-      e.date, e.account?.code ?? '', e.activity_type,
-      String(e.hours), e.comment ?? '', e.status,
-    ]))
+    filtered.forEach(e => rows.push([e.date, e.account?.code ?? '', e.activity_type, String(e.hours), e.comment ?? '', STATUS_LABEL[e.status] ?? e.status]))
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')
-    const a = document.createElement('a')
-    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-    a.download = `imputaciones-${new Date().toISOString().slice(0,7)}.csv`
-    a.click()
-    addToast('CSV exportado', 'success')
+    const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+    a.download = `imputaciones-${new Date().toISOString().slice(0,7)}.csv`; a.click()
+    toast('CSV exportado', 'success')
   }
 
-  const filtered = useMemo(() => {
-    return initialEntries.filter(e => {
-      const matchFilter = filter === 'Todos' || e.activity_type === filter
-      const matchSearch = !search || (e.account?.code ?? '').toLowerCase().includes(search.toLowerCase())
-      return matchFilter && matchSearch
-    })
-  }, [initialEntries, filter, search])
+  const filtered = useMemo(() =>
+    initial.filter(e =>
+      (filter === 'Todos' || e.activity_type === filter) &&
+      (!search || (e.account?.code ?? '').toLowerCase().includes(search.toLowerCase()))
+    )
+  , [initial, filter, search])
 
   const groupedAccounts = useMemo(() =>
     accounts.reduce<Record<string, typeof accounts>>((acc, a) => {
-      if (!acc[a.group_name]) acc[a.group_name] = []
-      acc[a.group_name].push(a)
+      const key = a.sector ?? 'General'
+      if (!acc[key]) acc[key] = []
+      acc[key].push(a)
       return acc
     }, {})
   , [accounts])
 
   return (
     <>
-      {/* Filters bar */}
-      <div style={{
-        background: 'var(--bg)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
-        padding: '14px 16px',
-        display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
-      }}>
-        {STATUS_FILTERS.map(f => (
-          <button key={f} onClick={() => setFilter(f)} style={{
-            padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-            border: `1px solid ${filter === f ? 'var(--cu)' : 'var(--border2)'}`,
-            background: filter === f ? 'var(--cu-light)' : 'var(--bg)',
-            color: filter === f ? 'var(--cu-dark)' : 'var(--text2)',
-            cursor: 'pointer', transition: 'all .15s',
-          }}>{f}</button>
+      {/* Filters */}
+      <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', padding: '14px 16px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        {FILTERS.map(f => (
+          <button key={f} onClick={() => setFilter(f)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, border: `1px solid ${filter === f ? 'var(--cu)' : 'var(--border2)'}`, background: filter === f ? 'var(--cu-light)' : 'var(--bg)', color: filter === f ? 'var(--cu-dark)' : 'var(--text2)', cursor: 'pointer', transition: 'all .15s' }}>{f}</button>
         ))}
-
-        <input
-          type="text" placeholder="Buscar subcuenta…"
-          value={search} onChange={e => setSearch(e.target.value)}
-          className="form-input"
-          style={{ width: 180, padding: '5px 10px', marginLeft: 'auto' }}
-        />
+        <input type="text" placeholder="Buscar subcuenta…" value={search} onChange={e => setSearch(e.target.value)} className="form-input" style={{ width: 180, padding: '5px 10px', marginLeft: 'auto' }} />
         <button onClick={exportCSV} className="btn btn-sm">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Exportar CSV
         </button>
       </div>
 
       {/* Table */}
-      <div style={{
-        background: 'var(--bg)', border: '1px solid var(--border)',
-        borderTop: 'none', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
-        overflow: 'hidden',
-      }}>
+      <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)', overflow: 'hidden' }}>
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: 'var(--text3)' }}>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
-              style={{ margin: '0 auto 12px', display: 'block', opacity: 0.35 }}>
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
             <p style={{ fontSize: 13 }}>No hay imputaciones que coincidan con el filtro.</p>
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr>
-                {['Fecha','Subcuenta','Actividad','Horas','Comentario','Estado',''].map(h => (
-                  <th key={h} style={{
-                    textAlign: 'left', padding: '10px 16px', fontSize: 11, fontWeight: 600,
-                    color: 'var(--text3)', letterSpacing: '0.4px', textTransform: 'uppercase',
-                    background: 'var(--bg2)', borderBottom: '1px solid var(--border)',
-                  }}>{h}</th>
-                ))}
-              </tr>
+              <tr>{['Fecha','Subcuenta','Actividad','Horas','Comentario','Estado',''].map(h => (
+                <th key={h} style={{ textAlign: 'left', padding: '10px 16px', fontSize: 11, fontWeight: 600, color: 'var(--text3)', letterSpacing: '0.4px', textTransform: 'uppercase', background: 'var(--bg2)', borderBottom: '1px solid var(--border)' }}>{h}</th>
+              ))}</tr>
             </thead>
             <tbody>
               {filtered.map(e => (
                 <tr key={e.id} style={{ borderBottom: '1px solid var(--border)' }}
-                  onMouseEnter={ev => { const btns = ev.currentTarget.querySelector<HTMLDivElement>('.row-actions'); if(btns) btns.style.opacity='1' }}
-                  onMouseLeave={ev => { const btns = ev.currentTarget.querySelector<HTMLDivElement>('.row-actions'); if(btns) btns.style.opacity='0' }}
+                  onMouseEnter={ev => { (ev.currentTarget.querySelector('.ra') as HTMLElement | null)?.style?.setProperty('opacity','1') }}
+                  onMouseLeave={ev => { (ev.currentTarget.querySelector('.ra') as HTMLElement | null)?.style?.setProperty('opacity','0') }}
                 >
                   <td style={{ padding: '11px 16px', fontSize: 13 }}>{formatDate(e.date)}</td>
-                  <td style={{ padding: '11px 16px', fontSize: 12, fontFamily: 'DM Mono,monospace', color: 'var(--text2)' }}>
-                    {e.account?.code ?? '—'}
-                  </td>
-                  <td style={{ padding: '11px 16px' }}>
-                    <span className="badge badge-blue">{e.activity_type}</span>
-                  </td>
+                  <td style={{ padding: '11px 16px', fontSize: 12, fontFamily: 'DM Mono,monospace', color: 'var(--text2)' }}>{e.account?.code ?? '—'}</td>
+                  <td style={{ padding: '11px 16px' }}><span className="badge badge-blue">{e.activity_type}</span></td>
                   <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 600 }}>{e.hours}hs</td>
-                  <td style={{ padding: '11px 16px', fontSize: 13, color: 'var(--text3)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {e.comment || '—'}
+                  <td style={{ padding: '11px 16px', fontSize: 13, color: 'var(--text3)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.comment || '—'}</td>
+                  <td style={{ padding: '11px 16px' }}>
+                    <span className={`badge ${STATUS_BADGE[e.status] ?? 'badge-gray'}`}>{STATUS_LABEL[e.status] ?? e.status}</span>
                   </td>
                   <td style={{ padding: '11px 16px' }}>
-                    <span className={`badge ${e.status === 'aprobado' ? 'badge-green' : e.status === 'rechazado' ? 'badge-red' : 'badge-amber'}`}>
-                      {e.status === 'aprobado' ? 'Aprobado' : e.status === 'rechazado' ? 'Rechazado' : 'Pendiente'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '11px 16px' }}>
-                    <div className="row-actions" style={{ display: 'flex', gap: 4, opacity: 0, transition: 'opacity .15s' }}>
-                      <button onClick={() => openEdit(e)} style={{
-                        width: 26, height: 26, border: '1px solid var(--border)', borderRadius: 6,
-                        background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', color: 'var(--text2)', transition: 'all .15s',
-                      }} title="Editar">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
-                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
+                    <div className="ra" style={{ display: 'flex', gap: 4, opacity: 0, transition: 'opacity .15s' }}>
+                      <button onClick={() => openEdit(e)} style={{ width: 26, height: 26, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text2)' }} title="Editar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
-                      <button onClick={() => handleDelete(e.id)} style={{
-                        width: 26, height: 26, border: '1px solid var(--border)', borderRadius: 6,
-                        background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', color: 'var(--text2)', transition: 'all .15s',
-                      }} title="Eliminar"
+                      <button onClick={() => handleDelete(e.id)}
                         onMouseEnter={ev => { const b = ev.currentTarget; b.style.borderColor='var(--danger)'; b.style.background='var(--danger-bg)'; b.style.color='var(--danger)' }}
                         onMouseLeave={ev => { const b = ev.currentTarget; b.style.borderColor='var(--border)'; b.style.background='var(--bg)'; b.style.color='var(--text2)' }}
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
-                          <polyline points="3 6 5 6 21 6"/>
-                          <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-                          <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                        </svg>
+                        style={{ width: 26, height: 26, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text2)' }} title="Eliminar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
                       </button>
                     </div>
                   </td>
@@ -231,20 +151,13 @@ export default function HistorialTable({ entries: initialEntries, accounts }: Pr
 
       {/* Edit Modal */}
       {editEntry && (
-        <div
-          onClick={e => { if (e.target === e.currentTarget) closeEdit() }}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
-          }}
-        >
+        <div onClick={e => { if (e.target === e.currentTarget) setEditEntry(null) }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius-lg)', padding: 24, width: 480, maxWidth: '95vw', boxShadow: '0 20px 40px rgba(0,0,0,.15)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Editar imputación</div>
-              <button onClick={closeEdit} style={{ width: 28, height: 28, border: 'none', background: 'var(--bg2)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text2)' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
+              <button onClick={() => setEditEntry(null)} style={{ width: 28, height: 28, border: 'none', background: 'var(--bg2)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text2)' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 
@@ -255,15 +168,15 @@ export default function HistorialTable({ entries: initialEntries, accounts }: Pr
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text2)' }}>Horas</label>
-                <input type="number" className="form-input" value={editHours} min="0.5" max="12" step="0.5" onChange={e => setEditHours(parseFloat(e.target.value))} />
+                <input type="number" className="form-input" value={editHours} min="0.5" max="24" step="0.5" onChange={e => setEditHours(parseFloat(e.target.value))} />
               </div>
             </div>
 
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text2)', marginBottom: 5 }}>Subcuenta</label>
               <select className="form-input" value={editAccount} onChange={e => setEditAccount(e.target.value)}>
-                {Object.entries(groupedAccounts).map(([group, accs]) => (
-                  <optgroup key={group} label={group}>
+                {Object.entries(groupedAccounts).map(([g, accs]) => (
+                  <optgroup key={g} label={g}>
                     {accs.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                   </optgroup>
                 ))}
@@ -277,16 +190,14 @@ export default function HistorialTable({ entries: initialEntries, accounts }: Pr
               </select>
             </div>
 
-            <div style={{ marginBottom: 4 }}>
+            <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text2)', marginBottom: 5 }}>Comentario</label>
               <textarea className="form-input" value={editComment} onChange={e => setEditComment(e.target.value)} />
             </div>
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-              <button onClick={closeEdit} className="btn">Cancelar</button>
-              <button onClick={handleSaveEdit} className="btn btn-primary" disabled={isPending}>
-                {isPending ? 'Guardando…' : 'Guardar cambios'}
-              </button>
+              <button onClick={() => setEditEntry(null)} className="btn">Cancelar</button>
+              <button onClick={handleSave} className="btn btn-primary" disabled={isPending}>{isPending ? 'Guardando…' : 'Guardar cambios'}</button>
             </div>
           </div>
         </div>
@@ -296,10 +207,7 @@ export default function HistorialTable({ entries: initialEntries, accounts }: Pr
       <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 200, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {toasts.map(t => (
           <div key={t.id} className={`toast ${t.type}`}>
-            {t.type === 'success'
-              ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="15" height="15"><polyline points="20 6 9 17 4 12"/></svg>
-              : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            }
+            {t.type === 'success' ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="15" height="15"><polyline points="20 6 9 17 4 12"/></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
             {t.msg}
           </div>
         ))}

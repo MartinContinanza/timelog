@@ -16,27 +16,25 @@ export type ActivityType =
   | 'Licencia'
   | 'Vacaciones'
 
-export type EntryStatus    = 'pendiente' | 'aprobado' | 'rechazado'
-export type ClosureStatus  = 'open' | 'submitted' | 'approved' | 'rejected'
+// Matches real DB check constraints
+export type EntryStatus   = 'draft' | 'submitted' | 'approved' | 'rejected'
+export type ClosureStatus = 'open'  | 'submitted' | 'approved' | 'rejected'
 
-// ─── Row shapes (same as Database['public']['Tables'][X]['Row']) ───────────────
+// ─── Row shapes ───────────────────────────────────────────────────────────────
 export interface EmployeeRow {
-  id: string
+  id: string            // = auth.uid() (Supabase pattern)
   email: string
   full_name: string
-  initials: string
   sector: string
-  role: string
   approver_id: string | null
-  monthly_hours_target: number
   created_at: string
 }
 
 export interface AccountRow {
   id: string
-  code: string       // e.g. "CE.PP.AMARFOOD"
-  name: string       // e.g. "Amarfood SA"
-  group_name: string // e.g. "Auditoría"
+  code: string
+  name: string
+  sector: string | null  // used for optgroup label
   active: boolean
   created_at: string
 }
@@ -45,39 +43,38 @@ export interface EntryRow {
   id: string
   employee_id: string
   account_id: string
-  date: string
+  date: string            // "YYYY-MM-DD"
   hours: number
   activity_type: ActivityType
   comment: string | null
   status: EntryStatus
   created_at: string
+  updated_at: string
 }
 
 export interface MonthlyClosureRow {
   id: string
   employee_id: string
-  period: string      // "YYYY-MM"
-  total_hours: number
+  period: string          // "YYYY-MM"
   submitted_at: string | null
   approved_at: string | null
   approver_id: string | null
   status: ClosureStatus
-  created_at: string
 }
 
-// ─── Convenience aliases with joined relations ────────────────────────────────
+// ─── Convenience aliases with relations ───────────────────────────────────────
 export type Employee       = EmployeeRow
 export type Account        = AccountRow
 export type Entry          = EntryRow & { account?: AccountRow; employee?: EmployeeRow }
 export type MonthlyClosure = MonthlyClosureRow & { employee?: EmployeeRow; approver?: EmployeeRow }
 
-// ─── Supabase Database type (matches GenericSchema expected by supabase-js v2) ─
+// ─── Supabase Database generic (matches GenericSchema) ────────────────────────
 export type Database = {
   public: {
     Tables: {
       employees: {
         Row: EmployeeRow
-        Insert: Omit<EmployeeRow, 'id' | 'created_at'>
+        Insert: Omit<EmployeeRow, 'created_at'>
         Update: Partial<Omit<EmployeeRow, 'id' | 'created_at'>>
         Relationships: []
       }
@@ -89,37 +86,19 @@ export type Database = {
       }
       entries: {
         Row: EntryRow
-        Insert: Omit<EntryRow, 'id' | 'created_at'>
-        Update: Partial<Omit<EntryRow, 'id' | 'created_at'>>
+        Insert: Omit<EntryRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<EntryRow, 'id' | 'created_at' | 'updated_at'>>
         Relationships: [
-          {
-            foreignKeyName: 'entries_employee_id_fkey'
-            columns: ['employee_id']
-            isOneToOne: false
-            referencedRelation: 'employees'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'entries_account_id_fkey'
-            columns: ['account_id']
-            isOneToOne: false
-            referencedRelation: 'accounts'
-            referencedColumns: ['id']
-          },
+          { foreignKeyName: 'entries_employee_id_fkey'; columns: ['employee_id']; isOneToOne: false; referencedRelation: 'employees'; referencedColumns: ['id'] },
+          { foreignKeyName: 'entries_account_id_fkey'; columns: ['account_id']; isOneToOne: false; referencedRelation: 'accounts'; referencedColumns: ['id'] },
         ]
       }
       monthly_closures: {
         Row: MonthlyClosureRow
-        Insert: Omit<MonthlyClosureRow, 'id' | 'created_at'>
-        Update: Partial<Omit<MonthlyClosureRow, 'id' | 'created_at'>>
+        Insert: Omit<MonthlyClosureRow, 'id'>
+        Update: Partial<Omit<MonthlyClosureRow, 'id'>>
         Relationships: [
-          {
-            foreignKeyName: 'monthly_closures_employee_id_fkey'
-            columns: ['employee_id']
-            isOneToOne: false
-            referencedRelation: 'employees'
-            referencedColumns: ['id']
-          },
+          { foreignKeyName: 'monthly_closures_employee_id_fkey'; columns: ['employee_id']; isOneToOne: false; referencedRelation: 'employees'; referencedColumns: ['id'] },
         ]
       }
     }

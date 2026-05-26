@@ -1,23 +1,21 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/sidebar'
+import type { EmployeeRow } from '@/types/database'
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
   if (!user) redirect('/login')
 
-  // Fetch employee profile
-  const { data: employee } = await supabase
+  // employees.id = auth.uid() (RLS pattern)
+  const { data: empData } = await supabase
     .from('employees')
     .select('*')
-    .eq('email', user.email!)
+    .eq('id', user.id)
     .single()
+
+  const employee = empData as EmployeeRow | null
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>

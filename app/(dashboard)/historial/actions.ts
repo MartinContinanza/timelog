@@ -12,33 +12,22 @@ export async function deleteEntry(id: string) {
   const { error } = await supabase.from('entries').delete().eq('id', id)
   if (error) return { error: error.message }
 
-  revalidatePath('/historial')
-  revalidatePath('/dashboard')
+  revalidatePath('/historial'); revalidatePath('/dashboard')
   return { success: 'Imputación eliminada' }
 }
 
 export async function updateEntry(
   id: string,
-  data: {
-    date: string
-    hours: number
-    account_id: string
-    activity_type: ActivityType
-    comment: string | null
-  }
+  data: { date: string; hours: number; account_id: string; activity_type: ActivityType; comment: string | null }
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase.from('entries') as any)
-    .update({ ...data })
-    .eq('id', id)
-
+  const { error } = await (supabase.from('entries') as any).update({ ...data }).eq('id', id)
   if (error) return { error: error.message }
 
-  revalidatePath('/historial')
-  revalidatePath('/dashboard')
+  revalidatePath('/historial'); revalidatePath('/dashboard')
   return { success: 'Imputación actualizada' }
 }

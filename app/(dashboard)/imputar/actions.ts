@@ -9,8 +9,9 @@ export async function createEntries(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
+  // employees.id = auth.uid()
   const { data: empData } = await supabase
-    .from('employees').select('id').eq('email', user.email!).single()
+    .from('employees').select('id').eq('id', user.id).single()
   const employee = empData as { id: string } | null
   if (!employee) return { error: 'Perfil de empleado no encontrado' }
 
@@ -33,7 +34,7 @@ export async function createEntries(formData: FormData) {
 
     const { error } = await supabase.from('entries').insert({
       employee_id: employee.id, account_id: accountId,
-      date, hours, activity_type: activityType, comment, status: 'pendiente',
+      date, hours, activity_type: activityType, comment, status: 'draft',
     } as any)
     if (error) return { error: error.message }
     revalidatePath('/dashboard'); revalidatePath('/historial')
@@ -47,7 +48,7 @@ export async function createEntries(formData: FormData) {
     const hours = parseFloat(formData.get('hours') as string)
     if (!desde || !hasta || isNaN(hours)) return { error: 'Completá todos los campos' }
 
-    const rows: Omit<EntryRow, 'id' | 'created_at'>[] = []
+    const rows: Omit<EntryRow, 'id' | 'created_at' | 'updated_at'>[] = []
     const current = new Date(desde + 'T00:00:00')
     const end     = new Date(hasta + 'T00:00:00')
 
@@ -57,7 +58,7 @@ export async function createEntries(formData: FormData) {
         rows.push({
           employee_id: employee.id, account_id: accountId,
           date: current.toISOString().split('T')[0],
-          hours, activity_type: activityType, comment, status: 'pendiente',
+          hours, activity_type: activityType, comment, status: 'draft',
         })
       }
       current.setDate(current.getDate() + 1)
@@ -72,20 +73,19 @@ export async function createEntries(formData: FormData) {
 
   // ── Semana completa ───────────────────────────────────────
   if (mode === 'semana') {
-    const week = formData.get('week') as string // "YYYY-Www"
+    const week = formData.get('week') as string  // "YYYY-Www"
     if (!week) return { error: 'Seleccioná una semana' }
 
     const [yearStr, wStr] = week.split('-W')
     const year    = parseInt(yearStr)
     const weekNum = parseInt(wStr)
 
-    // ISO week: Monday of week
     const jan4   = new Date(year, 0, 4)
     const dow4   = jan4.getDay() || 7
     const monday = new Date(jan4)
     monday.setDate(jan4.getDate() - dow4 + 1 + (weekNum - 1) * 7)
 
-    const rows: Omit<EntryRow, 'id' | 'created_at'>[] = []
+    const rows: Omit<EntryRow, 'id' | 'created_at' | 'updated_at'>[] = []
     for (let i = 0; i < 5; i++) {
       const day = new Date(monday)
       day.setDate(monday.getDate() + i)
@@ -93,7 +93,7 @@ export async function createEntries(formData: FormData) {
         rows.push({
           employee_id: employee.id, account_id: accountId,
           date: day.toISOString().split('T')[0],
-          hours: 8, activity_type: activityType, comment, status: 'pendiente',
+          hours: 8, activity_type: activityType, comment, status: 'draft',
         })
       }
     }
