@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+/* ─── Design tokens ───────────────────────────────────── */
+:root {
+  --cu:          #3EB2ED;
+  --cu-dark:     #1a8fc4;
+  --cu-light:    #e8f6fd;
+  --cu-pale:     #f4fbff;
+
+  --bg:          #ffffff;
+  --bg2:         #f8fafc;
+  --bg3:         #f1f5f9;
+
+  --text:        #0f172a;
+  --text2:       #475569;
+  --text3:       #94a3b8;
+
+  --border:      #e2e8f0;
+  --border2:     #cbd5e1;
+
+  --success:     #22c55e;
+  --success-bg:  #f0fdf4;
+  --warning:     #f59e0b;
+  --warning-bg:  #fffbeb;
+  --danger:      #ef4444;
+  --danger-bg:   #fef2f2;
+
+  --radius:      10px;
+  --radius-lg:   16px;
+  --shadow:      0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:   0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+}
+
+/* ─── Tailwind v4 theme tokens ────────────────────────── */
+@theme inline {
+  --color-cu:         var(--cu);
+  --color-cu-dark:    var(--cu-dark);
+  --color-cu-light:   var(--cu-light);
+  --color-cu-pale:    var(--cu-pale);
+  --color-bg:         var(--bg);
+  --color-bg2:        var(--bg2);
+  --color-bg3:        var(--bg3);
+  --color-text:       var(--text);
+  --color-text2:      var(--text2);
+  --color-text3:      var(--text3);
+  --color-border:     var(--border);
+  --color-border2:    var(--border2);
+  --color-success:    var(--success);
+  --color-warning:    var(--warning);
+  --color-danger:     var(--danger);
+  --font-sans:        'DM Sans', sans-serif;
+  --font-mono:        'DM Mono', monospace;
+}
+
+/* ─── Base reset ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg2);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* ─── Form inputs ─────────────────────────────────────── */
+.form-input {
+  padding: 8px 12px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  transition: border-color .15s, box-shadow .15s;
+  outline: none;
+  width: 100%;
+}
+.form-input:focus {
+  border-color: var(--cu);
+  box-shadow: 0 0 0 3px rgba(62,178,237,.12);
+}
+.form-input::placeholder { color: var(--text3); }
+select.form-input { cursor: pointer; }
+textarea.form-input { resize: vertical; min-height: 68px; }
+
+/* ─── Buttons ─────────────────────────────────────────── */
+.btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border2);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all .15s;
+}
+.btn:hover { background: var(--bg2); }
+.btn-primary { background: var(--cu); color: white; border-color: var(--cu); }
+.btn-primary:hover { background: var(--cu-dark); border-color: var(--cu-dark); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-ghost { border-color: transparent; background: transparent; }
+.btn-ghost:hover { background: var(--bg2); }
+
+/* ─── Badges ──────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.badge-blue   { background: var(--cu-light); color: var(--cu-dark); }
+.badge-green  { background: var(--success-bg); color: #15803d; }
+.badge-amber  { background: var(--warning-bg); color: #92400e; }
+.badge-red    { background: var(--danger-bg); color: #991b1b; }
+.badge-gray   { background: var(--bg3); color: var(--text2); }
+
+/* ─── Toast ───────────────────────────────────────────── */
+@keyframes slideIn {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+.toast {
+  background: var(--text);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideIn .2s ease;
+  max-width: 300px;
+}
+.toast.success { background: #15803d; }
+.toast.error   { background: #991b1b; }
