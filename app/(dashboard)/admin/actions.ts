@@ -91,7 +91,10 @@ export async function updateEmployee(id: string, form: EmployeeFormData): Promis
   }
 }
 
-/** Reenvía invitación. Usa generateLink para usuarios ya existentes. */
+/** Reenvía acceso al usuario.
+ *  Usa 'recovery' (reset de contraseña) para usuarios ya registrados,
+ *  lo que evita el error "user already registered" de inviteUserByEmail.
+ *  El link lleva a /auth/confirm → /set-password igual que la invitación. */
 export async function resendInvite(email: string): Promise<Result> {
   try {
     const admin = await assertAdmin()
@@ -100,18 +103,14 @@ export async function resendInvite(email: string): Promise<Result> {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
     const redirectTo = siteUrl ? `${siteUrl}/auth/confirm?next=/set-password` : undefined
 
-    // generateLink funciona para usuarios ya creados (no lanza "already registered")
-    const { error: linkErr } = await (admin.auth.admin as any).generateLink({
-      type: 'invite',
+    // recovery funciona para usuarios ya creados — envía email de reset de contraseña
+    const { error } = await (admin.auth.admin as any).generateLink({
+      type: 'recovery',
       email,
       options: { redirectTo },
     })
 
-    if (linkErr) {
-      // Fallback: inviteUserByEmail para usuarios nuevos
-      const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo })
-      if (inviteErr) return { ok: false, error: inviteErr.message }
-    }
+    if (error) return { ok: false, error: error.message }
 
     revalidatePath('/admin')
     return { ok: true }
