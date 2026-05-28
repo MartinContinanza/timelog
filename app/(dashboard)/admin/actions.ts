@@ -39,9 +39,13 @@ export async function inviteEmployee(form: EmployeeFormData): Promise<Result> {
     const admin = await assertAdmin()
     if (!admin) return { ok: false, error: 'No autorizado' }
 
+    // redirectTo lleva al usuario a /auth/confirm → /set-password al aceptar la invitación
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+    const redirectTo = siteUrl ? `${siteUrl}/auth/confirm?next=/set-password` : undefined
+
     const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(
       form.email,
-      { data: { full_name: form.full_name } }
+      { data: { full_name: form.full_name }, redirectTo }
     )
     if (inviteErr) return { ok: false, error: inviteErr.message }
 
@@ -93,15 +97,19 @@ export async function resendInvite(email: string): Promise<Result> {
     const admin = await assertAdmin()
     if (!admin) return { ok: false, error: 'No autorizado' }
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+    const redirectTo = siteUrl ? `${siteUrl}/auth/confirm?next=/set-password` : undefined
+
     // generateLink funciona para usuarios ya creados (no lanza "already registered")
     const { error: linkErr } = await (admin.auth.admin as any).generateLink({
       type: 'invite',
       email,
+      options: { redirectTo },
     })
 
     if (linkErr) {
       // Fallback: inviteUserByEmail para usuarios nuevos
-      const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email)
+      const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo })
       if (inviteErr) return { ok: false, error: inviteErr.message }
     }
 
