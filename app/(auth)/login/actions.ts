@@ -44,17 +44,17 @@ export async function register(formData: FormData): Promise<{ error?: string }> 
     return { error: createError.message }
   }
 
-  // Crear registro en employees
-  const { error: empError } = await admin.from('employees').insert({
+  // Upsert en employees — sobrescribe aunque un trigger haya creado el registro vacío
+  const { error: empError } = await admin.from('employees').upsert({
     id: createData.user.id,
     email,
     full_name: fullName,
     sector: '',
     role: 1,
     approver_id: null,
-  } as any)
+  } as any, { onConflict: 'id' })
 
-  if (empError && empError.code !== '23505') return { error: empError.message }
+  if (empError) return { error: empError.message }
 
   // Iniciar sesión automáticamente (el usuario no debería tener que volver a poner sus datos)
   const supabase = await createClient()
