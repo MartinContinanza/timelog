@@ -92,29 +92,27 @@ export default function AdminClient({ employees, currentUserId }: Props) {
     }
 
     startTransition(async () => {
-      try {
-        if (modal.mode === 'create') {
-          await inviteEmployee(payload)
-          showToast(`Invitación enviada a ${payload.email}`)
-        } else {
-          await updateEmployee(modal.employeeId!, payload)
-          showToast('Cambios guardados')
-        }
-        closeModal()
-        router.refresh()
-      } catch (e: any) {
-        setError(e.message ?? 'Error desconocido')
+      if (modal.mode === 'create') {
+        const result = await inviteEmployee(payload)
+        if (!result.ok) { setError(result.error); return }
+        showToast(`Invitación enviada a ${payload.email}`)
+      } else {
+        const result = await updateEmployee(modal.employeeId!, payload)
+        if (!result.ok) { setError(result.error); return }
+        showToast('Cambios guardados')
       }
+      closeModal()
+      router.refresh()
     })
   }
 
   function handleResend(email: string) {
     startTransition(async () => {
-      try {
-        await resendInvite(email)
+      const result = await resendInvite(email)
+      if (!result.ok) {
+        showToast(`Error: ${result.error}`)
+      } else {
         showToast(`Invitación reenviada a ${email}`)
-      } catch (e: any) {
-        showToast(`Error: ${e.message}`)
       }
     })
   }

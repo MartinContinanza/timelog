@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string }
+
 /** Verifica que el usuario logueado sea admin (role=3) */
 async function assertAdmin() {
   const supabase = await createClient()
@@ -18,7 +20,7 @@ async function assertAdmin() {
     .single()
 
   if (!data || (data as any).role !== 3) {
-    throw new Error('No autorizado')
+    return null
   }
   return createAdminClient()
 }
@@ -32,52 +34,80 @@ export type EmployeeFormData = {
 }
 
 /** Invita al usuario por email y crea su registro en employees */
-export async function inviteEmployee(form: EmployeeFormData) {
-  const admin = await assertAdmin()
+export async function inviteEmployee(form: EmployeeFormData): Promise<Result> {
+  try {
+    const admin = await assertAdmin()
+    if (!admin) return { ok: false, error: 'No autorizado' }
 
-  // Invite via Supabase Auth (sends email with magic link)
-  const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(
-    form.email,
-    { data: { full_name: form.full_name } }
-  )
-  if (inviteErr) throw new Error(inviteErr.message)
+    const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(
+      form.email,
+      { data: { full_name: form.full_name } }
+    )
+    if (inviteErr) return { ok: false, error: inviteErr.message }
 
-  const userId = inviteData.user.id
+    const userId = inviteData.user.id
 
-  // Create employee record
-  const { error: empErr } = await admin.from('employees').insert({
-    id: userId,
-    full_name: form.full_name,
-    email: form.email,
-    sector: form.sector,
-    role: form.role,
-    approver_id: form.approver_id ?? null,
-  } as any)
-  if (empErr) throw new Error(empErr.message)
+    const { error: empErr } = await admin.from('employees').insert({
+      id: userId,
+      full_name: form.full_name,
+      email: form.email,
+      sector: form.sector,
+      role: form.role,
+      approver_id: form.approver_id ?? null,
+    } as any)
+    if (empErr) return { ok: false, error: empErr.message }
 
-  revalidatePath('/admin')
+    revalidatePath('/admin')
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'Error desconocido' }
+  }
 }
 
 /** Actualiza datos de un empleado existente */
-export async function updateEmployee(id: string, form: EmployeeFormData) {
-  const admin = await assertAdmin()
+export async function updateEmployee(id: string, form: EmployeeFormData): Promise<Result> {
+  try {
+    const admin = await assertAdmin()
+    if (!admin) return { ok: false, error: 'No autorizado' }
 
-  const { error } = await admin.from('employees').update({
-    full_name: form.full_name,
-    email: form.email,
-    sector: form.sector,
-    role: form.role,
-    approver_id: form.approver_id ?? null,
-  } as any).eq('id', id)
+    const { error } = await admin.from('employees').update({
+      full_name: form.full_name,
+      email: form.email,
+      sector: form.sector,
+      role: form.role,
+      approver_id: form.approver_id ?? null,
+    } as any).eq('id', id)
 
-  if (error) throw new Error(error.message)
-  revalidatePath('/admin')
+    if (error) return { ok: false, error: error.message }
+
+    revalidatePath('/admin')
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'Error desconocido' }
+  }
 }
 
-/** Reenvía invitación a un email (útil si el usuario no recibió/expiró el link) */
-export async function resendInvite(email: string) {
-  const admin = await assertAdmin()
-  const { error } = await admin.auth.admin.inviteUserByEmail(email)
-  if (error) throw new Error(error.message)
-  revalidatePath('/admin')
+/** Reenvía invitación. Usa generateLink para usuarios ya existentes. */
+export async function resendInvite(email: string): Promise<Result> {
+  try {
+    const admin = await assertAdmin()
+    if (!admin) return { ok: false, error: 'No autorizado' }
+
+    // generateLink funciona para usuarios ya creados (no lanza "already registered")
+    const { error: linkErr } = await (admin.auth.admin as any).generateLink({
+      type: 'invite',
+      email,
+    })
+
+    if (linkErr) {
+      // Fallback: inviteUserByEmail para usuarios nuevos
+      const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email)
+      if (inviteErr) return { ok: false, error: inviteErr.message }
+    }
+
+    revalidatePath('/admin')
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'Error desconocido' }
+  }
 }
