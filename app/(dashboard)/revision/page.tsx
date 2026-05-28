@@ -21,17 +21,7 @@ export default async function RevisionPage() {
     .from('entries').select('date, hours, status').eq('employee_id', user.id).gte('date', periodStart)
   const entries = (entriesData ?? []) as Pick<EntryRow, 'date' | 'hours' | 'status'>[]
 
-  const totalHours    = entries.reduce((s, e) => s + e.hours, 0)
-  const daysImputados = new Set(entries.map(e => e.date)).size
-
-  // Count working days passed this month
-  const lastDay = now.getDate()
-  let workingDaysPassed = 0
-  for (let d = 1; d <= lastDay; d++) {
-    const dow = new Date(now.getFullYear(), now.getMonth(), d).getDay()
-    if (dow !== 0 && dow !== 6) workingDaysPassed++
-  }
-  const missingDays = Math.max(workingDaysPassed - daysImputados, 0)
+  const totalHours = entries.reduce((s, e) => s + e.hours, 0)
 
   const { data: closureData } = await supabase
     .from('monthly_closures').select('*').eq('employee_id', user.id).eq('period', period).single()
@@ -57,7 +47,6 @@ export default async function RevisionPage() {
     if (apprData) approverName = (apprData as { full_name: string }).full_name
   }
 
-  const closeDay   = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
   const monthLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
 
   return (
@@ -72,9 +61,8 @@ export default async function RevisionPage() {
         <RevisionClient
           period={period} monthLabel={monthLabel}
           totalHours={totalHours} hoursTarget={HOURS_TARGET}
-          missingDays={missingDays} approverName={approverName}
+          approverName={approverName}
           currentClosure={currentClosure} pastClosures={pastClosures}
-          closeDay={closeDay}
         />
       </div>
     </>

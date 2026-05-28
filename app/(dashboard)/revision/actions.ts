@@ -26,3 +26,19 @@ export async function submitToReview(period: string) {
   revalidatePath('/revision'); revalidatePath('/dashboard')
   return { success: 'Enviado a revisión correctamente' }
 }
+
+export async function annulSubmission(period: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const { error } = await (supabase.from('monthly_closures') as any)
+    .update({ status: 'open', submitted_at: null })
+    .eq('employee_id', user.id)
+    .eq('period', period)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/revision'); revalidatePath('/dashboard')
+  return { success: 'Envío anulado. Podés corregir y reenviar.' }
+}

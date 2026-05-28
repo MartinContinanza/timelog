@@ -110,7 +110,6 @@ export default function Sidebar({ employee }: SidebarProps) {
           </div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.3px' }}>TimeLog</div>
-            <div style={{ fontSize: 10, color: 'var(--text3)', letterSpacing: '0.5px', textTransform: 'uppercase', marginTop: 1 }}>Control Union</div>
           </div>
         </div>
       </div>

@@ -17,8 +17,8 @@ const dmMono = DM_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'TimeLog — Control Union',
-  description: 'Sistema de imputación de horas de Control Union',
+  title: 'TimeLog',
+  description: 'Sistema de imputación de horas',
 }
 
 export default function RootLayout({

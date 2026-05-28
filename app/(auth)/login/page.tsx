@@ -44,9 +44,6 @@ export default function LoginPage() {
           <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.3px' }}>
             TimeLog
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text3)', letterSpacing: '0.8px', textTransform: 'uppercase', marginTop: 2 }}>
-            Control Union
-          </div>
         </div>
 
         {/* Card */}
@@ -61,7 +58,7 @@ export default function LoginPage() {
             Iniciá sesión
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 24 }}>
-            Ingresá con tu cuenta de Control Union
+            Ingresá con tu cuenta corporativa
           </p>
 
           <form onSubmit={handleSubmit}>
@@ -93,7 +90,7 @@ export default function LoginPage() {
                 className="form-input"
                 type="email"
                 name="email"
-                placeholder="tu@controlunion.com"
+                placeholder="tu@empresa.com"
                 autoComplete="email"
                 required
                 disabled={isPending}

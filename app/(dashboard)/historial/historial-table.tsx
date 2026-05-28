@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
+import * as XLSX from 'xlsx'
 import { deleteEntry, updateEntry } from './actions'
 import type { EntryRow, AccountRow, ActivityType } from '@/types/database'
 import { formatDate, STATUS_LABEL, STATUS_BADGE } from '@/lib/utils'
@@ -63,13 +64,21 @@ export default function HistorialTable({ entries: initial, accounts }: Props) {
     })
   }
 
-  function exportCSV() {
-    const rows = [['Fecha','Subcuenta','Actividad','Horas','Comentario','Estado']]
-    filtered.forEach(e => rows.push([e.date, e.account?.code ?? '', e.activity_type, String(e.hours), e.comment ?? '', STATUS_LABEL[e.status] ?? e.status]))
-    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')
-    const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
-    a.download = `imputaciones-${new Date().toISOString().slice(0,7)}.csv`; a.click()
-    toast('CSV exportado', 'success')
+  function exportExcel() {
+    const rows = filtered.map(e => ({
+      Fecha: e.date,
+      Subcuenta: e.account?.code ?? '',
+      Nombre: e.account?.name ?? '',
+      Actividad: e.activity_type,
+      Horas: e.hours,
+      Comentario: e.comment ?? '',
+      Estado: STATUS_LABEL[e.status] ?? e.status,
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Imputaciones')
+    XLSX.writeFile(wb, `imputaciones-${new Date().toISOString().slice(0, 7)}.xlsx`)
+    toast('Excel exportado', 'success')
   }
 
   const filtered = useMemo(() =>
@@ -96,9 +105,9 @@ export default function HistorialTable({ entries: initial, accounts }: Props) {
           <button key={f} onClick={() => setFilter(f)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, border: `1px solid ${filter === f ? 'var(--cu)' : 'var(--border2)'}`, background: filter === f ? 'var(--cu-light)' : 'var(--bg)', color: filter === f ? 'var(--cu-dark)' : 'var(--text2)', cursor: 'pointer', transition: 'all .15s' }}>{f}</button>
         ))}
         <input type="text" placeholder="Buscar subcuenta…" value={search} onChange={e => setSearch(e.target.value)} className="form-input" style={{ width: 180, padding: '5px 10px', marginLeft: 'auto' }} />
-        <button onClick={exportCSV} className="btn btn-sm">
+        <button onClick={exportExcel} className="btn btn-sm">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Exportar CSV
+          Exportar Excel
         </button>
       </div>
 
