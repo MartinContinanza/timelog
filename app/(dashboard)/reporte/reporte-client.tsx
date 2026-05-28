@@ -6,17 +6,20 @@ import type { EntryRow, AccountRow, EmployeeRow } from '@/types/database'
 
 type EntryFull = EntryRow & {
   account: Pick<AccountRow, 'code' | 'name' | 'sector'> | null
-  employee: Pick<EmployeeRow, 'full_name' | 'sector'> | null
+  employee: Pick<EmployeeRow, 'id' | 'full_name' | 'sector'> | null
 }
+
+type ClosureInfo = { status: string; submitted_at: string | null; approved_at: string | null }
 
 interface Props {
   entries: EntryFull[]
+  closureMap: Record<string, ClosureInfo>
   months: { value: string; label: string }[]
   period: string
   periodLabel: string
 }
 
-export default function ReporteClient({ entries, months, period, periodLabel }: Props) {
+export default function ReporteClient({ entries, closureMap, months, period, periodLabel }: Props) {
   const [vista, setVista] = useState<'detalle' | 'resumen'>('detalle')
   const [filterEmployee, setFilterEmployee] = useState('Todos')
 
@@ -124,8 +127,8 @@ export default function ReporteClient({ entries, months, period, periodLabel }: 
 
         {entries.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: 'var(--text3)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-            <p style={{ fontSize: 13 }}>No hay imputaciones enviadas en este período.</p>
-            <p style={{ fontSize: 12, marginTop: 6 }}>Solo se muestran entradas con estado &quot;enviado&quot; o &quot;aprobado&quot;.</p>
+            <p style={{ fontSize: 13 }}>No hay imputaciones en este período.</p>
+            <p style={{ fontSize: 12, marginTop: 6 }}>Cuando los empleados carguen horas aparecerán aquí.</p>
           </div>
         ) : vista === 'detalle' ? (
           /* VISTA 1: Detail */
@@ -150,7 +153,12 @@ export default function ReporteClient({ entries, months, period, periodLabel }: 
                     <td style={{ padding: '10px 16px', fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>{e.account?.code ?? '—'}</td>
                     <td style={{ padding: '10px 16px' }}><span className="badge badge-blue">{e.activity_type}</span></td>
                     <td style={{ padding: '10px 16px', fontSize: 13, fontWeight: 600 }}>{e.hours}hs</td>
-                    <td style={{ padding: '10px 16px' }}><span className={`badge ${e.status === 'approved' ? 'badge-green' : 'badge-blue'}`}>{e.status === 'approved' ? 'Aprobado' : 'En revisión'}</span></td>
+                    <td style={{ padding: '10px 16px' }}>{(() => {
+                      const closure = e.employee?.id ? closureMap[e.employee.id] : undefined
+                      if (closure?.status === 'approved') return <span className="badge badge-green">✓ Aprobado</span>
+                      if (closure?.status === 'submitted') return <span className="badge badge-blue">⏳ En revisión</span>
+                      return <span className="badge" style={{ background: 'var(--bg2)', color: 'var(--text3)' }}>Sin enviar</span>
+                    })()}</td>
                   </tr>
                 ))}
               </tbody>
