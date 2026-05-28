@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { login } from './actions'
+import { login, register } from './actions'
 
 export default function LoginPage() {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -12,9 +13,14 @@ export default function LoginPage() {
     setError(null)
     const formData = new FormData(e.currentTarget)
     startTransition(async () => {
-      const result = await login(formData)
+      const result = mode === 'login' ? await login(formData) : await register(formData)
       if (result?.error) setError(result.error)
     })
+  }
+
+  function switchMode(next: 'login' | 'register') {
+    setMode(next)
+    setError(null)
   }
 
   return (
@@ -54,15 +60,28 @@ export default function LoginPage() {
           padding: '32px',
           boxShadow: 'var(--shadow-md)',
         }}>
-          <h1 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
-            Iniciá sesión
-          </h1>
-          <p style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 24 }}>
-            Ingresá con tu cuenta corporativa
-          </p>
+          {/* Tab switcher */}
+          <div style={{ display: 'flex', background: 'var(--bg2)', borderRadius: 8, padding: 3, gap: 2, marginBottom: 24 }}>
+            {(['login', 'register'] as const).map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => switchMode(m)}
+                style={{
+                  flex: 1, padding: '7px 12px', borderRadius: 6, fontSize: 13, fontWeight: 500,
+                  border: 'none', cursor: 'pointer', transition: 'all .15s',
+                  background: mode === m ? 'var(--bg)' : 'transparent',
+                  color: mode === m ? 'var(--text)' : 'var(--text3)',
+                  boxShadow: mode === m ? 'var(--shadow)' : 'none',
+                }}
+              >
+                {m === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+              </button>
+            ))}
+          </div>
 
           <form onSubmit={handleSubmit}>
-            {/* Error alert */}
+            {/* Error */}
             {error && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
@@ -78,6 +97,25 @@ export default function LoginPage() {
                   <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
                 {error}
+              </div>
+            )}
+
+            {/* Nombre completo — solo en registro */}
+            {mode === 'register' && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text2)', marginBottom: 5 }}>
+                  Nombre completo <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <input
+                  className="form-input"
+                  type="text"
+                  name="full_name"
+                  placeholder="Ej: Martín García"
+                  autoComplete="name"
+                  required={mode === 'register'}
+                  disabled={isPending}
+                  autoFocus
+                />
               </div>
             )}
 
@@ -97,7 +135,7 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Password */}
+            {/* Contraseña */}
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text2)', marginBottom: 5 }}>
                 Contraseña <span style={{ color: 'var(--danger)' }}>*</span>
@@ -106,8 +144,8 @@ export default function LoginPage() {
                 className="form-input"
                 type="password"
                 name="password"
-                placeholder="••••••••"
-                autoComplete="current-password"
+                placeholder={mode === 'register' ? 'Mínimo 8 caracteres' : '••••••••'}
+                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                 required
                 disabled={isPending}
               />
@@ -128,11 +166,11 @@ export default function LoginPage() {
                   >
                     <path d="M21 12a9 9 0 11-6.219-8.56"/>
                   </svg>
-                  Ingresando…
+                  {mode === 'login' ? 'Ingresando…' : 'Creando cuenta…'}
                 </>
               ) : (
                 <>
-                  Ingresar
+                  {mode === 'login' ? 'Ingresar' : 'Crear cuenta y entrar'}
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
                   </svg>
@@ -143,11 +181,10 @@ export default function LoginPage() {
         </div>
 
         <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text3)', marginTop: 20 }}>
-          ¿Problemas para ingresar? Contactá a IT.
+          {mode === 'login' ? '¿Problemas para ingresar? Contactá a IT.' : 'Al registrarte aceptás los términos de uso.'}
         </p>
       </div>
 
-      {/* Spinner keyframe */}
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
