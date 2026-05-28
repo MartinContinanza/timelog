@@ -67,6 +67,21 @@ const REPORT_ITEMS = [
   },
 ]
 
+const ADMIN_ITEMS = [
+  {
+    href: '/admin',
+    label: 'Usuarios',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+        <path d="M16 3.13a4 4 0 010 7.75"/>
+      </svg>
+    ),
+  },
+]
+
 function NavLink({ href, label, icon, active }: { href: string; label: string; icon: React.ReactNode; active: boolean }) {
   return (
     <Link href={href} style={{ textDecoration: 'none' }}>
@@ -127,6 +142,17 @@ export default function Sidebar({ employee }: SidebarProps) {
         {REPORT_ITEMS.map(item => (
           <NavLink key={item.href} {...item} active={isActive(item.href)} />
         ))}
+
+        {employee?.role === 3 && (
+          <>
+            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text3)', padding: '6px 10px 4px', marginTop: 8 }}>
+              Administración
+            </div>
+            {ADMIN_ITEMS.map(item => (
+              <NavLink key={item.href} {...item} active={isActive(item.href)} />
+            ))}
+          </>
+        )}
       </nav>
 
       {/* User */}

@@ -26,6 +26,7 @@ export interface EmployeeRow {
   email: string
   full_name: string
   sector: string
+  role: number          // 1=Empleado, 2=Supervisor, 3=Administrador
   approver_id: string | null
   created_at: string
 }
@@ -74,7 +75,7 @@ export type Database = {
     Tables: {
       employees: {
         Row: EmployeeRow
-        Insert: Omit<EmployeeRow, 'created_at'>
+        Insert: Omit<EmployeeRow, 'created_at'> & { role?: number }
         Update: Partial<Omit<EmployeeRow, 'id' | 'created_at'>>
         Relationships: []
       }

@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(Get-Process *)"
+      "PowerShell(Get-Process *)",
+      "PowerShell(git *)",
+      "PowerShell(git rebase *)",
+      "PowerShell(git reset *)",
+      "Bash(npm install *)",
+      "Bash(npx next *)",
+      "PowerShell(npm install *)",
+      "Bash(cmd /c \"set NODE_OPTIONS=--use-system-ca && node_modules\\\\.bin\\\\next.cmd build\")",
+      "PowerShell(cd C:\\\\Users\\\\marti\\\\timelog; $env:NODE_OPTIONS=\"--use-system-ca\"; node_modules\\\\.bin\\\\next.cmd build 2>&1)"
     ]
   }
 }
