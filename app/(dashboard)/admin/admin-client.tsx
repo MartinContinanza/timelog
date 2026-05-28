@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeRow } from '@/types/database'
-import { inviteEmployee, updateEmployee, resendInvite, type EmployeeFormData } from './actions'
+import { inviteEmployee, updateEmployee, resendInvite, generateAccessLink, type EmployeeFormData } from './actions'
 import { getInitials } from '@/lib/utils'
 
 const ROLE_LABEL: Record<number, string> = { 1: 'Empleado', 2: 'Supervisor', 3: 'Administrador' }
@@ -29,6 +29,7 @@ export default function AdminClient({ employees, currentUserId }: Props) {
 
   // Modal state
   const [modal, setModal] = useState<{ open: boolean; mode: 'create' | 'edit'; employeeId?: string }>({ open: false, mode: 'create' })
+  const [linkModal, setLinkModal] = useState<{ open: boolean; link: string; email: string }>({ open: false, link: '', email: '' })
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -112,7 +113,18 @@ export default function AdminClient({ employees, currentUserId }: Props) {
       if (!result.ok) {
         showToast(`Error: ${result.error}`)
       } else {
-        showToast(`Invitación reenviada a ${email}`)
+        showToast(`Email enviado a ${email}`)
+      }
+    })
+  }
+
+  function handleCopyLink(email: string) {
+    startTransition(async () => {
+      const result = await generateAccessLink(email)
+      if (!result.ok) {
+        showToast(`Error: ${result.error}`)
+      } else {
+        setLinkModal({ open: true, link: result.data!, email })
       }
     })
   }
@@ -196,18 +208,19 @@ export default function AdminClient({ employees, currentUserId }: Props) {
                     </td>
                     {/* Acciones */}
                     <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <button onClick={() => openEdit(emp)} className="btn btn-sm">
                           Editar
                         </button>
                         <button
-                          onClick={() => handleResend(emp.email)}
+                          onClick={() => handleCopyLink(emp.email)}
                           disabled={isPending}
                           className="btn btn-sm"
-                          style={{ background: 'transparent', color: 'var(--text3)', border: '1px solid var(--border)' }}
-                          title="Reenviar email de invitación"
+                          style={{ background: 'transparent', color: 'var(--cu)', border: '1px solid var(--cu)', display: 'flex', alignItems: 'center', gap: 4 }}
+                          title="Generar link de acceso para copiar y enviar"
                         >
-                          Reenviar invitación
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                          Copiar link
                         </button>
                       </div>
                     </td>
@@ -230,6 +243,50 @@ export default function AdminClient({ employees, currentUserId }: Props) {
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, right: 24, background: 'var(--text)', color: 'var(--bg)', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,.2)' }}>
           {toast}
+        </div>
+      )}
+
+      {/* Modal: link de acceso */}
+      {linkModal.open && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={e => { if (e.target === e.currentTarget) setLinkModal(l => ({ ...l, open: false })) }}
+        >
+          <div style={{ background: 'var(--bg)', borderRadius: 12, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Link de acceso</div>
+              <button onClick={() => setLinkModal(l => ({ ...l, open: false }))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>
+                Copiá este link y mandáselo a <strong>{linkModal.email}</strong> por WhatsApp, Slack o email manual. Expira en 24 hs.
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  readOnly
+                  value={linkModal.link}
+                  className="form-input"
+                  style={{ flex: 1, fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}
+                  onFocus={e => e.target.select()}
+                />
+                <button
+                  className="btn btn-sm"
+                  style={{ flexShrink: 0 }}
+                  onClick={() => {
+                    navigator.clipboard.writeText(linkModal.link)
+                    showToast('Link copiado al portapapeles')
+                  }}
+                >
+                  Copiar
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text3)', margin: 0 }}>
+                Al hacer click, el usuario va a llegar a una página para crear su contraseña.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

@@ -91,10 +91,7 @@ export async function updateEmployee(id: string, form: EmployeeFormData): Promis
   }
 }
 
-/** Reenvía acceso al usuario.
- *  Usa 'recovery' (reset de contraseña) para usuarios ya registrados,
- *  lo que evita el error "user already registered" de inviteUserByEmail.
- *  El link lleva a /auth/confirm → /set-password igual que la invitación. */
+/** Reenvía email de acceso (recovery). */
 export async function resendInvite(email: string): Promise<Result> {
   try {
     const admin = await assertAdmin()
@@ -103,7 +100,6 @@ export async function resendInvite(email: string): Promise<Result> {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
     const redirectTo = siteUrl ? `${siteUrl}/auth/confirm?next=/set-password` : undefined
 
-    // recovery funciona para usuarios ya creados — envía email de reset de contraseña
     const { error } = await (admin.auth.admin as any).generateLink({
       type: 'recovery',
       email,
@@ -114,6 +110,33 @@ export async function resendInvite(email: string): Promise<Result> {
 
     revalidatePath('/admin')
     return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'Error desconocido' }
+  }
+}
+
+/** Genera un link de acceso directo (sin depender del email).
+ *  Retorna la URL para que el admin la copie y la mande por otro canal. */
+export async function generateAccessLink(email: string): Promise<Result<string>> {
+  try {
+    const admin = await assertAdmin()
+    if (!admin) return { ok: false, error: 'No autorizado' }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+    const redirectTo = siteUrl ? `${siteUrl}/auth/confirm?next=/set-password` : undefined
+
+    const { data, error } = await (admin.auth.admin as any).generateLink({
+      type: 'recovery',
+      email,
+      options: { redirectTo },
+    })
+
+    if (error) return { ok: false, error: error.message }
+
+    const link: string = data?.properties?.action_link ?? data?.action_link ?? ''
+    if (!link) return { ok: false, error: 'No se pudo generar el link' }
+
+    return { ok: true, data: link }
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Error desconocido' }
   }
